@@ -1,0 +1,47 @@
+@Toolbc.Api_HostAddress = http://localhost:5272
+
+GET {{Toolbc.Api_HostAddress}}/api/health
+Accept: application/json
+
+###
+
+POST {{Toolbc.Api_HostAddress}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@admin.com",
+  "password": "Admin123!"
+}
+
+###
+
+POST {{Toolbc.Api_HostAddress}}/api/bootstrap/admin
+Content-Type: application/json
+
+{
+  "fullName": "Admin ToolBC",
+  "email": "admin@admin.com",
+  "password": "Admin123!",
+  "role": "Admin"
+}
+
+###
+
+POST {{Toolbc.Api_HostAddress}}/api/admin/users
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "fullName": "Dr. Arya Pratama",
+  "email": "arya@dokter.com",
+  "password": "Dokter123!",
+  "role": "Doctor",
+  "note": "Pulmonology"
+}
+
+###
+
+GET {{Toolbc.Api_HostAddress}}/api/admin/doctors
+Authorization: Bearer {{accessToken}}
+
+###
