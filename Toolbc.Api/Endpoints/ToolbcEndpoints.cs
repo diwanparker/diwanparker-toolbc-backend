@@ -353,11 +353,16 @@ public static class ToolbcEndpoints
                         (reminder.Status == ReminderStatus.Pending || reminder.Status == ReminderStatus.Escalated),
             cancellationToken);
 
+        var todayUtc = DateTime.UtcNow.Date;
+        var todayReviews = await db.SymptomLogs.CountAsync(
+            log => patientIds.Contains(log.PatientProfileId) && log.LoggedAt >= todayUtc,
+            cancellationToken);
+
         return Results.Ok(new DoctorDashboardResponse(
             AuthService.ToUserResponse(doctor.User),
             doctor.Patients.Count,
             urgentAlerts,
-            doctor.Patients.Count,
+            todayReviews,
             pendingFollowUp));
     }
 
@@ -372,16 +377,28 @@ public static class ToolbcEndpoints
             return Results.NotFound(new { error = "Profil dokter belum tersedia." });
         }
 
+        var patientIds = doctor.Patients.Select(patient => patient.Id).ToArray();
+        var latestRisks = await db.SymptomLogs
+            .Where(log => patientIds.Contains(log.PatientProfileId))
+            .GroupBy(log => log.PatientProfileId)
+            .Select(group => new
+            {
+                PatientProfileId = group.Key,
+                RiskLevel = group.OrderByDescending(log => log.LoggedAt).First().RiskLevel
+            })
+            .ToDictionaryAsync(item => item.PatientProfileId, item => item.RiskLevel, cancellationToken);
+
         var response = doctor.Patients.Select(patient =>
         {
             var summary = BuildTreatmentSummary(patient);
+            var risk = latestRisks.TryGetValue(patient.Id, out var r) ? r : RiskLevel.Low;
             return new DoctorPatientDto(
                 patient.Id,
                 patient.User.FullName,
                 patient.MedicalRecordNumber,
                 summary.TreatmentDay,
                 summary.AdherencePercent,
-                RiskLevel.Low,
+                risk,
                 summary.AdherencePercent < 80 ? "Needs review" : "Stable");
         });
 
@@ -442,11 +459,20 @@ public static class ToolbcEndpoints
     private static async Task<IResult> UpdateReminderStatusAsync(
         Guid id,
         ReminderStatus status,
+        ClaimsPrincipal principal,
         ToolbcDbContext db,
         CancellationToken cancellationToken)
     {
+        var doctor = await LoadDoctorProfile(db, principal.GetUserId(), cancellationToken);
+        if (doctor is null)
+        {
+            return Results.NotFound(new { error = "Profil dokter belum tersedia." });
+        }
+
+        var patientIds = doctor.Patients.Select(patient => patient.Id).ToHashSet();
+
         var reminder = await db.Reminders.FindAsync([id], cancellationToken);
-        if (reminder is null)
+        if (reminder is null || !patientIds.Contains(reminder.PatientProfileId))
         {
             return Results.NotFound(new { error = "Reminder tidak ditemukan." });
         }

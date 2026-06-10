@@ -2,7 +2,7 @@ using Toolbc.Api.Domain;
 
 namespace Toolbc.Api.Contracts;
 
-public sealed record MetricDto(string Label, string Value);
+
 
 public sealed record TreatmentSummaryDto(
     int TreatmentDay,
