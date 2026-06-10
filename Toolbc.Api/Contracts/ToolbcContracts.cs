@@ -21,7 +21,7 @@ public sealed record PatientDashboardResponse(
     IReadOnlyList<NotificationDto> Notifications);
 
 public sealed record MedicationLogRequest(
-    Guid DoseLogId,
+    string DoseLogId,
     DoseStatus Status,
     string? Notes = null);
 

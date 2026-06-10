@@ -188,13 +188,28 @@ public static class ToolbcEndpoints
         CancellationToken cancellationToken)
     {
         var userId = principal.GetUserId();
-        var doseLog = await db.MedicationDoseLogs
-            .AsTracking()
-            .Include(log => log.TreatmentPlan)
-            .ThenInclude(plan => plan.PatientProfile)
-            .FirstOrDefaultAsync(
-                log => log.Id == request.DoseLogId && log.TreatmentPlan.PatientProfile.UserId == userId,
-                cancellationToken);
+        MedicationDoseLog? doseLog = null;
+
+        if (string.Equals(request.DoseLogId, "today", StringComparison.OrdinalIgnoreCase))
+        {
+            doseLog = await db.MedicationDoseLogs
+                .AsTracking()
+                .Include(log => log.TreatmentPlan)
+                .ThenInclude(plan => plan.PatientProfile)
+                .Where(log => log.TreatmentPlan.PatientProfile.UserId == userId && log.Status == DoseStatus.Pending)
+                .OrderBy(log => log.ScheduledAt)
+                .FirstOrDefaultAsync(cancellationToken);
+        }
+        else if (Guid.TryParse(request.DoseLogId, out var parsedGuid))
+        {
+            doseLog = await db.MedicationDoseLogs
+                .AsTracking()
+                .Include(log => log.TreatmentPlan)
+                .ThenInclude(plan => plan.PatientProfile)
+                .FirstOrDefaultAsync(
+                    log => log.Id == parsedGuid && log.TreatmentPlan.PatientProfile.UserId == userId,
+                    cancellationToken);
+        }
 
         if (doseLog is null)
         {
